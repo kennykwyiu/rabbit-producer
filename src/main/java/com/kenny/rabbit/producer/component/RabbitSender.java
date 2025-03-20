@@ -32,7 +32,7 @@ public class RabbitSender {
          */
         @Override
         public void confirm(CorrelationData correlationData, boolean ack, String cause) {
-
+            System.err.println("Message ACK result: " + ack + ", correlationData: " + correlationData.getId());
         }
     };
 
@@ -45,27 +45,39 @@ public class RabbitSender {
      */
     public void send (Object message, Map<String, Object> properties) throws Exception {
 
+        // Create message headers from the given properties map.
         MessageHeaders mhs = new MessageHeaders(properties);
+
+        // Build a Spring Messaging message with the given payload and headers.
         Message<?> msg = MessageBuilder.createMessage(message, mhs);
 
+        // Generate a unique correlation ID for tracking message delivery.
         CorrelationData correlationData = new CorrelationData(UUID.randomUUID().toString());
 
+        // Define a MessagePostProcessor to perform additional processing before sending.
         MessagePostProcessor mpp = new MessagePostProcessor() {
             @Override
             public org.springframework.amqp.core.Message postProcessMessage(org.springframework.amqp.core.Message message) throws AmqpException {
-                log.info("---> post to do: "  + message);
-                return message;
+                log.info("---> post to do: " + message);  // Log message before sending
+                return message;  // Return the processed message
             }
         };
 
+        // Set the confirm callback to track whether RabbitMQ successfully received the message.
         rabbitTemplate.setConfirmCallback(confirmCallback);
+
+        // Send the message to RabbitMQ.
+        // - "exchange-1" is the exchange name.
+        // - "springboot.rabbit" is the routing key.
+        // - `msg` is the actual message object.
+        // - `mpp` applies additional processing before sending.
+        // - `correlationData` is used for tracking delivery confirmation.
         rabbitTemplate.convertAndSend("exchange-1",
                 "springboot.rabbit",
                 msg,
                 mpp,
                 correlationData
         );
-
     }
 
 }
